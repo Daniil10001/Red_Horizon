@@ -9,7 +9,7 @@ rs=rospy.Rate(10) # 10hz
    
 if __name__ == '__main__':
     while not rospy.is_shutdown():
-         hello_str = "hello world %s" % 1
+         hello_str = "server %s" % 1
          rospy.loginfo(hello_str)
          pub.publish(hello_str)
          rs.sleep()

@@ -4,7 +4,7 @@ from std_msgs.msg import String
 
 rospy.init_node('talker', anonymous=True)
 pub = rospy.Publisher('chatter', String, queue_size=10)
-rospy.Rate(10) # 10hz
+rs=rospy.Rate(10) # 10hz
 
    
 if __name__ == '__main__':
@@ -12,4 +12,4 @@ if __name__ == '__main__':
          hello_str = "hello world %s" % 1
          rospy.loginfo(hello_str)
          pub.publish(hello_str)
-         rospy.sleep()
+         rs.sleep()

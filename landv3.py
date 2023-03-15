@@ -8,10 +8,55 @@ from sensor_msgs.msg import Image
 import cv2
 import time
 from sensor_msgs.msg import Range
+from visualization_msgs.msg import MarkerArray,Marker
+
+rospy.init_node('flight')
+
+marker_pub = rospy.Publisher("/visualization_markers", MarkerArray, queue_size = 2)
+
+#Создаем MarkerArray для вывода стен
+markerArray = MarkerArray()
+
+#Отмечаем стены по координатам начала и конца
+def Mark_Wall(x1,y1,x2,y2,id,maxid):
+    marker = Marker()
+    marker.header.frame_id = "map"
+    marker.header.stamp = rospy.Time.now()
+    marker.type = 1
+    marker.id = id
+    #Задаем размеры стены
+    marker.scale.x = abs(x1-x2)+0.01
+    marker.scale.y = abs(y1-y2)+0.01
+    marker.scale.z = 1.5
+    #Задаем цвет стены
+    marker.color.r = 1.0*(1-id/maxid)
+    marker.color.g = 1.0*(id/maxid)
+    marker.color.b = 1.0
+    marker.color.a = 1.0
+    #Задаем координаты центра стены
+    marker.pose.position.x = (x1+x2)/2
+    marker.pose.position.y = (y1+y2)/2
+    marker.pose.position.z = 0
+    #Задаем поворот стены
+    marker.pose.orientation.x = 0.0
+    marker.pose.orientation.y = 0.0
+    marker.pose.orientation.z = 0.0
+    marker.pose.orientation.w = 1.0
+    # выводим стены
+    print("Wall ",i+1,': ',abs(x1-x2)+abs(x1-x2),'\n')
+    return marker
+#Массив координат краёв стен
+cord=[(1.0,3.0),(3.0,3.0),(3.0,4.0),(4.0,4.0),(4.0,1.0),(5.0,1.0),(5.0,4.0),(6.0,4.0),(6.0,1.0),(7.0,1.0),(7.0,4.0)]
+
+#Добавляем стены в массив маркеров
+for i in range(len(cord)-1):
+    markerArray.markers.append(Mark_Wall(cord[i][0],cord[i][1],cord[i+1][0],cord[i+1][1],i,len(cord)-1))
+    
+
 
 bridge = CvBridge()
 
-rospy.init_node('flight')
+
 
 get_telemetry = rospy.ServiceProxy('get_telemetry', srv.GetTelemetry)
 navigate = rospy.ServiceProxy('navigate', srv.Navigate)
@@ -123,6 +168,8 @@ def land_image(data):
             # Запоминаем время для PID-регулятора
             oldtime = time.time()
 
+            
+marker_pub.publish(markerArray)
 navigate_wait(z=1, frame_id='body', auto_arm=True)
 navigate_wait(x=0, y=4, z=1, frame_id='aruco_map')
 navigate_wait(x=7, y=0, z=1, frame_id='aruco_map')

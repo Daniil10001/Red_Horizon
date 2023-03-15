@@ -172,6 +172,7 @@ def land_image(data):
 marker_pub.publish(markerArray)
 navigate_wait(z=1, frame_id='body', auto_arm=True)
 navigate_wait(x=0, y=4, z=1, frame_id='aruco_map')
+navigate_wait(x=7, y=4, z=1, frame_id='aruco_map')
 navigate_wait(x=7, y=0, z=1, frame_id='aruco_map')
 navigate_wait(x=0, y=0, z=1, frame_id='aruco_map')
 navigate_wait(x=0.5, y=0.5, z=1, frame_id='aruco_map')

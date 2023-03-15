@@ -43,7 +43,7 @@ def Mark_Wall(x1,y1,x2,y2,id,maxid):
     marker.pose.orientation.z = 0.0
     marker.pose.orientation.w = 1.0
     # выводим стены
-    print("Wall ",i+1,': ',abs(x1-x2)+abs(x1-x2),'\n')
+    print("Wall ",i+1,': ',abs(x1-x2)+abs(x1-x2),'\n',end='')
     return marker
 #Массив координат краёв стен
 cord=[(1.0,3.0),(3.0,3.0),(3.0,4.0),(4.0,4.0),(4.0,1.0),(5.0,1.0),(5.0,4.0),(6.0,4.0),(6.0,1.0),(7.0,1.0),(7.0,4.0)]

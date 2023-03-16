@@ -31,11 +31,10 @@ def poisk(data):
               cv2.moments(imgvr)['m00']/(imgvr.shape[0]*imgvr.shape[1]*255),cv2.moments(imgvn)['m00']/(imgvn.shape[0]*imgvn.shape[1]*255)
     x,y,z=pose(tr="aruco_map")
     if (pvr>80):
-        if (y+0.1<6.7):
+        if (y+0.1<4.1):
             nav.append([x,y+0.1])
-    if (pr>80):
-        if (x+0.1<6.7):
+    elif (pr>80):
+        if (x+0.1<7.1):
             nav.append([x+0.1,y])
     else:
-        if (x-0.1<6.7):
-             nav.append([x-0.1,y])
+        nav.append([x,y-0.1])

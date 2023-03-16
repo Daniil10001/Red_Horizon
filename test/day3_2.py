@@ -1,3 +1,4 @@
+# Импортируем библиотеки
 import numpy as np
 import rospy
 from clover import srv
@@ -25,6 +26,7 @@ set_position = rospy.ServiceProxy('set_position', srv.SetPosition)
 set_velocity = rospy.ServiceProxy('set_velocity', srv.SetVelocity)
 land = rospy.ServiceProxy('land', Trigger)
 
+# Функция ожидания прилёта в заданные координаты
 def navigate_wait(x=0, y=0, z=0, yaw=float('nan'), speed=0.5, frame_id='', auto_arm=False, tolerance=0.1):
     navigate(x=x, y=y, z=z, yaw=yaw, speed=speed, frame_id=frame_id, auto_arm=auto_arm)
     while not rospy.is_shutdown():
@@ -33,25 +35,26 @@ def navigate_wait(x=0, y=0, z=0, yaw=float('nan'), speed=0.5, frame_id='', auto_
             break
         rospy.sleep(0.2)
 
+# Функция ожидания посадки
 def land_wait():
     land()
     while get_telemetry().armed:
         rospy.sleep(0.2)
 
 
-
+# Списки с информацией о возгораниях и пострадавших
 fire_arr = []
 hurt_arr = []
 # hsv-диапазоны для распознования возгорания, пострадавшего и зоны посадки
 fire_min, fire_max = [9, 68, 121], [35, 180, 255]
 hurt_min, hurt_max = [90, 75, 0], [255, 255, 255]
 land_min, land_max = [68, 20, 95], [90, 60, 161]
-
+# Image топики для отладки
 fire_detect = rospy.Publisher("/fire_detect", Image, queue_size=1)
 hurt_detect = rospy.Publisher("/hurt_detect", Image, queue_size=1)
 color_debug = rospy.Publisher("/color_debug", Image, queue_size=1)
 land_debug = rospy.Publisher("/land_debug", Image, queue_size=1)
-
+# Центр изображения
 img = bridge.imgmsg_to_cv2(rospy.wait_for_message('main_camera/image_raw', Image), 'bgr8')
 x_center, y_center = img.shape[1] / 2, img.shape[0] / 2 # Центр изображения
 
@@ -106,77 +109,79 @@ def PIDresult(Pk, Ik, Dk, P, I, D, err, preverr, tim): # Принимает: 3 �
     out = P * Pk + I * Ik + D * Dk # Складываем составляющие, умножая их на коэффициенты
     return out
 
+# Функция распознования возгораний и пострадавших
 def image_callback(data):
-    # возгорание
-    cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
+    # Возгорание
+    cv_image = bridge.imgmsg_to_cv2(data, 'bgr8') # Забираем изображение
     fire_cv_image = cv_image.copy()
     fire_cv_image_copy = cv_image.copy()
-    fire_hsv = cv2.cvtColor(fire_cv_image, cv2.COLOR_BGR2HSV)  # меняем BGR в HSV
-    fire_img = cv2.inRange(fire_hsv, np.array(fire_min), np.array(fire_max))  # цветокор для нахождения возгорания
-    contours_fire, _ = cv2.findContours(fire_img.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # поиск контуров возгорания
-    contours_fire.sort(key=cv2.minAreaRect)  # сортировка контуров по площади
-    # если есть возговрание
+    fire_hsv = cv2.cvtColor(fire_cv_image, cv2.COLOR_BGR2HSV)  # Конвертируем изображение из BGR в HSV
+    fire_img = cv2.inRange(fire_hsv, np.array(fire_min), np.array(fire_max))  # Цветокор для нахождения возгорания
+    contours_fire, _ = cv2.findContours(fire_img.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # Поиск контуров возгораний
+    contours_fire.sort(key=cv2.minAreaRect)  # Сортировка контуров по площади
+    # Если возгорания есть, обрабатываем их
     if len(contours_fire) > 0:
-        cnt_fire = contours_fire[0]
-        if cv2.contourArea(cnt_fire) > 100:
-            rect_fire = cv2.minAreaRect(cnt_fire)  # вписываем прямоугольник для поиска координат возгорания на изображении
+        cnt_fire = contours_fire[0] # Выбираем контур с наибольшей площадью
+        if cv2.contourArea(cnt_fire) > 100: # Если площадь более 100pix, обрабатываем возгорание
+            rect_fire = cv2.minAreaRect(cnt_fire)  # Вписываем прямоугольник для поиска координат возгорания на изображении
             (x_minkvad, y_minkvad), (w_minkvad, h_minkvad), angle = rect_fire
-            cv2.drawContours(fire_cv_image_copy, contours_fire, 0, (180, 105, 255), 3) # обводим возгорание
-            fire_detect.publish(bridge.cv2_to_imgmsg(fire_cv_image_copy, 'bgr8')) # публикуем обработанное изображение в fire_detect
-            # если возгорание близко к центру изображения, определяем его координаты (координаты коптера)
+            cv2.drawContours(fire_cv_image_copy, contours_fire, 0, (180, 105, 255), 3) # Обводим возгорание
+            fire_detect.publish(bridge.cv2_to_imgmsg(fire_cv_image_copy, 'bgr8')) # Публикуем обработанное изображение в fire_detect
+            # Если возгорание близко к центру изображения, определяем его координаты (координаты коптера)
             if abs(y_minkvad - y_center) < 75 and abs(x_minkvad - x_center) < 75:
                 telem_im = get_telemetry(frame_id='aruco_map')
                 xfire = telem_im.x
                 yfire = telem_im.y
-                # проверяем, что это не тот же самое возгорание
-                if len(fire_arr) > 0:
-                    for fire_info in fire_arr:
-                        x_dop, y_dop = fire_info[1], fire_info[2]
-                        if math.sqrt((x_dop - xfire) ** 2 + (y_dop - yfire) ** 2) < 0.3:
-                            break
+                # Проверяем, что это возгорание раннее распознано не было
+                for fire_info in fire_arr:
+                    x_dop, y_dop = fire_info[1], fire_info[2]
+                    if math.sqrt((x_dop - xfire) ** 2 + (y_dop - yfire) ** 2) < 0.3:
+                        break
+                else:
+                    # Запрос на сервер
+                    r = requests.get('http://65.108.222.51/check_material?x={x:.2f}&y={y:.2f}'.format(x=xfire, y=yfire), auth=('user', 'pass'))
+                    r = r.text
+                    # Обработка
+                    # Если материал распознан, то записываем информацию о возгорании в список
+                    if r.count("{") > 0:
+                        ans = "-"
                     else:
-                        # Запрос на сервер
-                        r = requests.get('http://65.108.222.51/check_material?x={x:.2f}&y={y:.2f}'.format(x=xfire, y=yfire), auth=('user', 'pass'))
-                        r = r.text
-                        # Обработка
-                        if r.count("{") > 0:
-                            ans = "-"
-                        else:
-                            material = r.split('"')[1]
-                            if material == "coal" or material == "textiles" or material == "plastics":
-                                clas = "A"
-                                dop = [xfire, yfire, material, clas]
-                            elif material == "oil" or material == "alcohol" or material == "glycerine":
-                                clas = "B"
-                                dop = [xfire, yfire, material, clas]
-                            fire_arr.append(dop)
-    # пострадавший
+                        material = r.split('"')[1]
+                        if material == "coal" or material == "textiles" or material == "plastics":
+                            clas = "A"
+                            dop = [xfire, yfire, material, clas]
+                        elif material == "oil" or material == "alcohol" or material == "glycerine":
+                            clas = "B"
+                            dop = [xfire, yfire, material, clas]
+                        fire_arr.append(dop)
+    # Пострадавший
     hurt_cv_image = cv_image.copy()
     hurt_cv_image_copy = hurt_cv_image.copy()
-    hurt_hsv = cv2.cvtColor(hurt_cv_image, cv2.COLOR_BGR2HSV)  # меняем BGR в HSV
-    hurt_img = cv2.inRange(hurt_hsv, np.array(hurt_min), np.array(hurt_max))  # цветокор для нахождения пострадавшего
-    contours_hurt, _ = cv2.findContours(hurt_img.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # обводим пострадавшего
-    contours_hurt.sort(key=cv2.minAreaRect)  # сортировка контуров по площади
-    # Если есть пострадавший
+    hurt_hsv = cv2.cvtColor(hurt_cv_image, cv2.COLOR_BGR2HSV)  # Конвертируем изображение из BGR в HSV
+    hurt_img = cv2.inRange(hurt_hsv, np.array(hurt_min), np.array(hurt_max))  # Цветокор для нахождения пострадавшего
+    contours_hurt, _ = cv2.findContours(hurt_img.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # Поиск контуров пострадавших
+    contours_hurt.sort(key=cv2.minAreaRect)  # Сортировка контуров по площади
+    # Если пострадавшие есть, обрабатываем их
     if len(contours_hurt) > 0:
-        cnt_hurt = contours_hurt[0]
-        if cv2.contourArea(cnt_hurt) > 100:
-            rect_hurt = cv2.minAreaRect(cnt_hurt)  # вписываем прямоугольник для поиска координат пострадавшего на изображении
+        cnt_hurt = contours_hurt[0] # Выбираем контур с наибольшей площадью
+        if cv2.contourArea(cnt_hurt) > 100: # Если площадь более 100pix, обрабатываем пострадавшего
+            rect_hurt = cv2.minAreaRect(cnt_hurt)  # Вписываем прямоугольник для поиска координат пострадавшего на изображении
             (x_minkvad, y_minkvad), (w_minkvad, h_minkvad), angle = rect_hurt
-            cv2.drawContours(hurt_cv_image_copy, contours_hurt, 0, (180, 105, 255), 3)  # обводим пострадавшего
-            hurt_detect.publish(bridge.cv2_to_imgmsg(hurt_cv_image_copy, 'bgr8'))  # публикуем обработанное изображение в hurt_detect
-            # если пострадавший близко к центру изображения, определяем его координаты (координаты коптера)
+            cv2.drawContours(hurt_cv_image_copy, contours_hurt, 0, (180, 105, 255), 3)  # Обводим пострадавшего
+            hurt_detect.publish(bridge.cv2_to_imgmsg(hurt_cv_image_copy, 'bgr8'))  # Публикуем обработанное изображение в hurt_detect
+            # Если пострадавший близко к центру изображения, определяем его координаты (координаты коптера)
             if abs(y_minkvad - y_center) < 75 and abs(x_minkvad - x_center) < 75:
                 telem_im = get_telemetry(frame_id='aruco_map')
                 xhurt = telem_im.x
                 yhurt = telem_im.y
-                # проверяем, что это не тот же самый пострадавший
+                # Проверяем, что это возгорание раннее распознано не было
                 if len(hurt_arr) > 0:
                     for hurt_info in hurt_arr:
                         x_dop, y_dop = hurt_info[1], hurt_info[2]
                         if math.sqrt((x_dop - xhurt) ** 2 + (y_dop - yhurt) ** 2) < 0.3:
                             break
                     else:
+                        # Ищем ближайшее к пострадавшему возгорание
                         mn = 999999999
                         count = 1
                         count_mn = -1
@@ -187,6 +192,7 @@ def image_callback(data):
                                 mn = rast
                                 count_mn = count
                             count += 1
+                        # Записываем информацию о поста=радавшем в список
                         dop = [xhurt, yhurt, count_mn]
                         hurt_arr.append(dop)
 
@@ -208,19 +214,19 @@ def pose(tr="aruco_map"):
 
 nav = [] # Массив координат, где мы были
 crd = (0, 0) # Координаты, куда нужно лететь
-status = 0 # Флаг статуса опреджелния стен
+status = 0 # Флаг статуса определния стен
 
-# Определяем есть ли стена возле коптера
+# Определяем, есть ли стена возле коптера
 def poisk(data):
     global status, nav, crd
     if status == -1:
         return
     img = bridge.imgmsg_to_cv2(data, 'bgr8')  # OpenCV image
-    # Берем изображение
+    # Берём изображение
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     # Накладываем маску ФАНЕРЫ
-    img = cv2.inRange(img, (0, 19, 114), (59, 95, 255))
-    # Берем кусочки фотографии, чтобы определить есть ли фанера спереди, сзади, слева, спарва
+    img = cv2.inRange(img, np.array(plywood_min), np.array(plywood_max))
+    # Берём кусочки фотографии, чтобы определить есть ли фанера спереди, сзади, слева, справа
     imgl = img[img.shape[0]//2-1:img.shape[0]//2+1, 0:int(img.shape[1]*0.375)] # Левый
     imgr = img[img.shape[0]//2-1:img.shape[0]//2+1, int(img.shape[1]*(1-0.375)):img.shape[1]] # Правый
     imgvr = img[0:int(img.shape[0]*0.3), img.shape[1]//2-1:img.shape[1]//2+1] # Прередний
@@ -228,9 +234,9 @@ def poisk(data):
     # Определяем процент заполнения кусочка
     pl, pr, pvr, pvn = cv2.moments(imgl)['m00']/(imgl.shape[0]*imgl.shape[1]*255), cv2.moments(imgr)['m00']/(imgr.shape[0]*imgr.shape[1]*255), \
               cv2.moments(imgvr)['m00']/(imgvr.shape[0]*imgvr.shape[1]*255), cv2.moments(imgvn)['m00']/(imgvn.shape[0]*imgvn.shape[1]*255)
-    x, y, z = pose(tr="aruco_map")
+    x, y, z = pose(tr='aruco_map')
     nav.append([x, y])
-    #Логика полета
+    #Логика полёта
     if pvr > 80:
         if y+0.1 < 4.1:
             nav.clear()
@@ -248,21 +254,22 @@ def poisk(data):
     else:
         crd = (x, y-0.1)
 
+# Функция центрирования над зоной посадки H
 def land_image(data):
     global oldtime, x_preverr, y_preverr, z_preverr, h_land
     realtime = time.time()
     land_cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')  # OpenCV image
     land_cv_image_copy = land_cv_image.copy() # Копия изображения
-    land_hsv = cv2.cvtColor(land_cv_image, cv2.COLOR_BGR2HSV) # Переводим из BGR в HSV
-    land_mask = cv2.inRange(land_hsv, np.array(land_min), np.array(land_max)) # Маска
-    land_debug.publish(bridge.cv2_to_imgmsg(land_mask, '8UC1')) # Публикуем в топик
+    land_hsv = cv2.cvtColor(land_cv_image, cv2.COLOR_BGR2HSV) # Конвертируем изображение из BGR в HSV
+    land_mask = cv2.inRange(land_hsv, np.array(land_min), np.array(land_max)) # Цветокор для нахождения зоны посадки
+    land_debug.publish(bridge.cv2_to_imgmsg(land_mask, '8UC1')) # Публикуем изображение в топик
     contours, _ = cv2.findContours(land_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # Search moments
     contours.sort(key=cv2.minAreaRect)  # Sort moments
     # Если есть посадочная площадка, летим к ней
     if len(contours) > 0:
-        cnt = contours[0]
-        if cv2.contourArea(cnt) > 50:
-            rect = cv2.minAreaRect(cnt) # пытаемся вписать прямоугольник
+        cnt = contours[0] # Выбираем контур с наибольшей площадью
+        if cv2.contourArea(cnt) > 50: # Если площадь более 50pix, обрабатываем возгорание
+            rect = cv2.minAreaRect(cnt) # Вписываем прямоугольник для поиска координат пострадавшего на изображении
             (x_min, y_min), (w_min, h_min), angle = rect
             height = rospy.wait_for_message('rangefinder/range', Range).range # Текущая высота
             cv2.drawContours(land_cv_image_copy, contours, 0, (180, 105, 255), 3)  # Обводим посадочную площадку
@@ -280,18 +287,39 @@ def land_image(data):
             # Запоминаем время для PID-регулятора
             oldtime = time.time()
 
+
 navigate_wait(z=1, frame_id='body', auto_arm=True) # Взлёт
+# Запоминаем координаты зоны взлёта/посадки
 telem = get_telemetry(frame_id='aruco_map')
-xstart, ystart = telem.x, telem.y # Запоминаем координаты зоны взлёта/посадки
-points = [[0.0, ystart], [0.0, 0.0], [0.0, 3.0], [1.5, 3.0], [1.5, 4.0], [4.0, 4.0], [4.0, 1.0], [4.0, 2.5], [7.0, 2.5], [7.0, 0.5], [7.0, 3.5], [4.0, 3.5], [4.0, 4.0], [0.0, 4.0], [0.0, 0.0], [xstart, ystart]]
+xstart, ystart = telem.x, telem.y 
 
-fire_hurt_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image_callback, queue_size=1) # Вкл мониторинг
+# Включаем мониторинг возгораний и пострадавших
+fire_hurt_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image_callback, queue_size=1)
 
-for point in points:
+# Полёт к началу стены
+points_start = [[0.0, ystart], [0.0, 0.0], [0.0, 3.0], [1.0, 3.0]]
+for point in points_start:
     x_point, y_point = point[0], point[1]
-    navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map')  # Полёт по точкам
+    navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map', tolerance=0.15)
+    
+# Включаем мониторинг стен
+poisk_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, poisk, queue_size=1)
 
-fire_hurt_sub.unregister() # Откл мониторинг
+# Полёт вдоль стены
+while status != -1:
+    x_nav, y_nav = crd
+    if x_nav != 0 and y_nav != 0:
+        navigate_wait(x=x_nav, y=y_nav, z=0.7, speed=0.35, frame_id='aruco_map', tolerance=0.05)
+
+poisk_sub.unregister() # Отключаем мониторинг стен
+
+# Полёт к зоне посадки
+points_finish = [[7.0, 4.0], [0.0, 4.0], [0.0, 0.0], [xstart, ystart]]
+for point in points_finish:
+    x_point, y_point = point[0], point[1]
+    navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map', tolerance=0.15)
+
+fire_hurt_sub.unregister() # Отключаем мониторинг возгораний и пострадавших
 
 # Посадка
 h_land = 0.8
@@ -303,6 +331,7 @@ land_sub.unregister()
 set_position(frame_id='aruco_map')
 land_wait()
 
+# Выводим автоматический отчёт
 print("Fires: {count}".format(len(fire_arr)))
 count = 1
 for fire in fire_arr:

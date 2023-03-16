@@ -39,7 +39,7 @@ def pose(tr="aruco_map"):
     return p.x,p.y,p.z,euler_from_quaternion([q.x,q.y,q.z,q.w])[-1]
 
 
-def navigate_wait(x=0, y=0, z=0, yaw=float('nan'), speed=0.5, frame_id='aruco_map', auto_arm=False, tolerance=0.1,tfi=0.2):
+def navigate_wait(x=0, y=0, z=0, yaw=float('nan'), speed=0.05, frame_id='aruco_map', auto_arm=False, tolerance=0.1,tfi=0.1):
     navigate(x=x, y=y, z=z, yaw=yaw, speed=speed, frame_id=frame_id, auto_arm=auto_arm)
 
     while not rospy.is_shutdown():

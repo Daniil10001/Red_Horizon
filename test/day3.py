@@ -226,7 +226,7 @@ fire_hurt_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image
 
 for point in points:
     x_point, y_point = point[0], point[1]
-    navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='body', auto_arm=True)  # Полёт по точкам
+    navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map')  # Полёт по точкам
 
 fire_hurt_sub.unregister() # Откл мониторинг
 

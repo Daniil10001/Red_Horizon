@@ -291,7 +291,7 @@ def land_image(data):
 navigate_wait(z=1, frame_id='body', auto_arm=True) # Взлёт
 # Запоминаем координаты зоны взлёта/посадки
 telem = get_telemetry(frame_id='aruco_map')
-xstart, ystart = telem.x, telem.y 
+xstart, ystart = telem.x, telem.y
 
 # Включаем мониторинг возгораний и пострадавших
 fire_hurt_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image_callback, queue_size=1)
@@ -301,7 +301,7 @@ points_start = [[0.0, ystart], [0.0, 0.0], [0.0, 3.0], [1.0, 3.0]]
 for point in points_start:
     x_point, y_point = point[0], point[1]
     navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map', tolerance=0.15)
-    
+
 # Включаем мониторинг стен
 poisk_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, poisk, queue_size=1)
 
@@ -311,7 +311,8 @@ while status != -1:
     if x_nav != 0 and y_nav != 0:
         navigate_wait(x=x_nav, y=y_nav, z=0.7, speed=0.35, frame_id='aruco_map', tolerance=0.05)
 
-poisk_sub.unregister() # Отключаем мониторинг стен
+# Отключаем мониторинг стен
+poisk_sub.unregister()
 
 # Полёт к зоне посадки
 points_finish = [[7.0, 4.0], [0.0, 4.0], [0.0, 0.0], [xstart, ystart]]
@@ -319,7 +320,8 @@ for point in points_finish:
     x_point, y_point = point[0], point[1]
     navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map', tolerance=0.15)
 
-fire_hurt_sub.unregister() # Отключаем мониторинг возгораний и пострадавших
+# Отключаем мониторинг возгораний и пострадавших
+fire_hurt_sub.unregister()
 
 # Посадка
 h_land = 0.8

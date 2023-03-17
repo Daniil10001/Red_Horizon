@@ -22,7 +22,7 @@ bridge = CvBridge()
 
 rospy.init_node('flight')
 
-pub_pp = rospy.Publisher("/visualization_pojar&postr", MarkerArray, queue_size=2)
+pub_pp = rospy.Publisher("/visualization_pojar_postr", MarkerArray, queue_size=2)
 pub_walls = rospy.Publisher("/visualization_walls", MarkerArray, queue_size=2)
 
 get_telemetry = rospy.ServiceProxy('get_telemetry', srv.GetTelemetry)

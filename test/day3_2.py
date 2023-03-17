@@ -49,7 +49,7 @@ hurt_arr = []
 fire_min, fire_max = [9, 68, 121], [35, 180, 255]
 hurt_min, hurt_max = [90, 75, 0], [255, 255, 255]
 land_min, land_max = [68, 20, 95], [90, 60, 161]
-plywood_min, plywood_max = [0,19,114], [59,95,255]
+plywood_min, plywood_max = [0,19,114], [78,95,255]
 # Image топики для отладки
 fire_detect = rospy.Publisher("/fire_detect", Image, queue_size=1)
 hurt_detect = rospy.Publisher("/hurt_detect", Image, queue_size=1)

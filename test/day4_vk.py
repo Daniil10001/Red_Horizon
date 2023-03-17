@@ -353,7 +353,7 @@ fire_hurt_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image
 prtresults = rospy.Subscriber('main_camera/image_raw_throttled', Image, prtres, queue_size=1)
 
 # Полёт к началу стены
-points_start = [[0.0, ystart], [0.0, 0.0], [0.0, 3.0], [1.0, 3.0]]
+points_start = [[0.0, ystart], [0.0, 0.0], [0.0, 4.0], [1.0, 4.0]]
 for point in points_start:
     x_point, y_point = point[0], point[1]
     navigate_wait(x=x_point, y=y_point, z=0.7, frame_id='aruco_map', tolerance=0.15)

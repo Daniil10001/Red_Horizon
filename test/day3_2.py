@@ -49,6 +49,7 @@ hurt_arr = []
 fire_min, fire_max = [9, 68, 121], [35, 180, 255]
 hurt_min, hurt_max = [90, 75, 0], [255, 255, 255]
 land_min, land_max = [68, 20, 95], [90, 60, 161]
+plywood_min, plywood_max = [0,19,114], [59,95,255]
 # Image топики для отладки
 fire_detect = rospy.Publisher("/fire_detect", Image, queue_size=1)
 hurt_detect = rospy.Publisher("/hurt_detect", Image, queue_size=1)
@@ -242,6 +243,8 @@ def poisk(data):
             nav.clear()
             crd = (x, y+0.1)
             status = 1
+        else:
+            status = -1
     elif status > 0:
         if pr > 80:
             status = 0
@@ -309,7 +312,7 @@ poisk_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, poisk, qu
 while status != -1:
     x_nav, y_nav = crd
     if x_nav != 0 and y_nav != 0:
-        navigate_wait(x=x_nav, y=y_nav, z=0.7, speed=0.35, frame_id='aruco_map', tolerance=0.05)
+        navigate(x=x_nav, y=y_nav, z=0.7, speed=0.35, frame_id='aruco_map')
 
 # Отключаем мониторинг стен
 poisk_sub.unregister()
